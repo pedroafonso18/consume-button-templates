@@ -162,14 +162,14 @@ The service expects webhook data in this format:
                   "text": "Vamos Simular!"
                 },
                 "context": {
-                  "from": "553840039592",
+                  "from": "xxxxxxxxxxxxxxxxxxxxxxx",
                   "gs_id": "...",
                   "id": "...",
                   "meta_msg_id": "..."
                 },
-                "from": "555180646622",
+                "from": "xxxxxxxxxxxxxxxxxxxxxxx",
                 "id": "...",
-                "timestamp": "1752151670",
+                "timestamp": "xxxxxxxxxxxxxxxxxxxxxxx",
                 "type": "button"
               }
             ],
@@ -178,10 +178,10 @@ The service expects webhook data in this format:
           }
         }
       ],
-      "id": "536438802876584"
+      "id": "xxxxxxxxxxxxxxxxxxxxxxx"
     }
   ],
-  "gs_app_id": "5e7432e3-0402-491d-8710-8a324998833b",
+  "gs_app_id": "xxxxxxxxxxxxxxxxxxxxxxx",
   "object": "whatsapp_business_account"
 }
 ```
