@@ -29,16 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let env_vars = config::config::load();
 
-
     loop {
-        let db_pool = db::connect::create_pool(&env_vars.db_url).await?;
-        let db_logs_pool = db::connect::create_pool(&env_vars.db_url_logs).await?;    
-        let db_client = db_pool.get().await?;
-        let db_logs = db_logs_pool.get().await?;
-        let db_client = Arc::new(db_client);
-        let db_logs = Arc::new(db_logs);
-
-        match run_consumer(&env_vars.rabbit_url, &db_client, &env_vars.api_key_gup, &env_vars.api_key_huggy, &env_vars.api_key_huggy2, &db_logs).await {
+        match run_consumer(&env_vars.rabbit_url, &env_vars.db_url, &env_vars.api_key_gup, &env_vars.api_key_huggy, &env_vars.api_key_huggy2, &env_vars.db_url_logs).await {
             Ok(_) => {
                 info!("Application shutdown requested");
                 break;
@@ -57,11 +49,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_consumer(
     rabbit_url: &str,
-    db_client: &Arc<deadpool_postgres::Object>,
+    db_url: &str,
     api_key_gup: &str,
     api_key_hug: &str,
     api_key_hug2: &str,
-    db_logs: &Arc<deadpool_postgres::Object>
+    db_url_logs: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (mut consumer, _) = match rmq_connect::create_rabbitmq_consumer(rabbit_url).await {
         Some((consumer, connection)) => (consumer, connection),
@@ -80,15 +72,48 @@ async fn run_consumer(
                 match delivery_result {
                     Some(Ok(delivery)) => {
                         let data = delivery.data.clone();
-                        let db = Arc::clone(db_client);
+                        let db_url = db_url.to_string();
+                        let db_url_logs = db_url_logs.to_string();
                         let api_key_hug = api_key_hug.to_string();
                         let api_key_gup = api_key_gup.to_string();
                         let api_key_hug2 = api_key_hug2.to_string();
-                        let db_logs = Arc::clone(db_logs);
 
                         let handle = tokio::spawn(async move {
                             info!("Starting webhook processing in spawned task");
-                            match process::process::process_webhook(&data, &db, &api_key_hug, &api_key_gup, &api_key_hug2, &db_logs).await {
+                            
+                            let db_pool = match db::connect::create_pool(&db_url).await {
+                                Ok(pool) => pool,
+                                Err(e) => {
+                                    error!("Failed to create database pool: {}", e);
+                                    return;
+                                }
+                            };
+                            
+                            let db_logs_pool = match db::connect::create_pool(&db_url_logs).await {
+                                Ok(pool) => pool,
+                                Err(e) => {
+                                    error!("Failed to create logs database pool: {}", e);
+                                    return;
+                                }
+                            };
+                            
+                            let db_client = match db_pool.get().await {
+                                Ok(client) => Arc::new(client),
+                                Err(e) => {
+                                    error!("Failed to get database client: {}", e);
+                                    return;
+                                }
+                            };
+                            
+                            let db_logs = match db_logs_pool.get().await {
+                                Ok(client) => Arc::new(client),
+                                Err(e) => {
+                                    error!("Failed to get logs database client: {}", e);
+                                    return;
+                                }
+                            };
+                            
+                            match process::process::process_webhook(&data, &db_client, &api_key_hug, &api_key_gup, &api_key_hug2, &db_logs).await {
                                 Ok(_) => {
                                     info!("Successfully processed webhook in spawned task");
                                 },
