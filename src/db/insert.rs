@@ -5,7 +5,8 @@ use deadpool_postgres;
 pub async fn insert_log(
     client: &deadpool_postgres::Object,
     num: &str,
-    msg: &str
+    msg: &str,
+    resp_cliente: &str
 ) -> Result<(), Error> {
     info!("Attempting to insert log into the database:");
 
@@ -20,8 +21,8 @@ pub async fn insert_log(
     }
 
     match client.execute(
-        "INSERT INTO \"button-answers\" (num, mensagem) VALUES ($1, $2)",
-        &[&num, &msg]
+        "INSERT INTO \"button-answers\" (num, mensagem, resposta_cliente) VALUES ($1, $2, $3)",
+        &[&num, &msg, &resp_cliente]
     ).await {
         Ok(_) => Ok(()),
         Err(e) => {

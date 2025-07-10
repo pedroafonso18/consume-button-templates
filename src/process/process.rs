@@ -123,7 +123,7 @@ pub async fn process_webhook(
     db_client_logs: &Object
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Processing webhook...");
-    let (source, whatsapp_number, button_text) = match parse_webhook_data(data)? {
+    let (source, whatsapp_number, button_text, ) = match parse_webhook_data(data)? {
         Some((context_from, message_from, button_text)) => (context_from, message_from, button_text),
         None => {
             error!("No source (context.from) found in webhook");
@@ -134,7 +134,16 @@ pub async fn process_webhook(
 
     if button_text != "Vamos Simular!" {
         info!("Button text '{}' is not 'Vamos Simular!', stopping processing", button_text);
-        return Ok(());
+        match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text).await {
+            Ok(_) => {
+                info!("Contact creation process completed successfully");
+                return Ok(())        
+            },
+            Err(e) => {
+                error!("Error when inserting log: {}",e);
+                return Ok(())
+            }
+        }
     }
     info!("Button text validation passed, continuing with processing");
 
@@ -157,8 +166,8 @@ pub async fn process_webhook(
     info!("Fetched connection: {}", conn);
 
     let conn_tuple = (conn, source);
-    crate::api::api::send_gupshup_message(api_key_gup, "Perfeito! 😊\nAgora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite:\n1 para Sim!\n\nDigite:\n2 para Não!\n", conn_tuple, &whatsapp_number).await?;
-    match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n").await {
+    crate::api::api::send_gupshup_message(api_key_gup, "Perfeito! 😊\nAgora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite:\n1️⃣ Sim, tenho acesso!\n2️⃣ Não tenho!", conn_tuple, &whatsapp_number).await?;
+    match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text).await {
         Ok(_) => {
             info!("Contact creation process completed successfully");
             Ok(())        

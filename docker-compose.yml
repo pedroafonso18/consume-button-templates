@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  webhook-consumer:
+    image: meuconsig/consome-template-botao:1.0.0
+    container_name: webhook-consumer
+    environment:
+      - DB_URL=${DB_URL}
+      - RABBIT_URL=${RABBIT_URL}
+      - API_KEY_HUGGY=${API_KEY_HUGGY}
+      - API_KEY_GUP=${API_KEY_GUP}
+      - API_KEY_HUGGY2=${API_KEY_HUGGY2}
+      - DB_URL_LOGS=${DB_URL_LOGS}
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == meuconsig2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: overlay
+    attachable: true
