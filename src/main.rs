@@ -30,12 +30,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let env_vars = config::config::load();
 
     let db_pool = db::connect::create_pool(&env_vars.db_url).await?;
+    let db_logs_pool = db::connect::create_pool(&env_vars.db_url_logs).await?;
 
     loop {
         let db_client = db_pool.get().await?;
+        let db_logs = db_logs_pool.get().await?;
         let db_client = Arc::new(db_client);
+        let db_logs = Arc::new(db_logs);
 
-        match run_consumer(&env_vars.rabbit_url, &db_client, &env_vars.api_key_gup, &env_vars.api_key_huggy).await {
+        match run_consumer(&env_vars.rabbit_url, &db_client, &env_vars.api_key_gup, &env_vars.api_key_huggy, &env_vars.api_key_huggy2, &db_logs).await {
             Ok(_) => {
                 info!("Application shutdown requested");
                 break;
@@ -57,6 +60,8 @@ async fn run_consumer(
     db_client: &Arc<deadpool_postgres::Object>,
     api_key_gup: &str,
     api_key_hug: &str,
+    api_key_hug2: &str,
+    db_logs: &Arc<deadpool_postgres::Object>
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (mut consumer, _) = match rmq_connect::create_rabbitmq_consumer(rabbit_url).await {
         Some((consumer, connection)) => (consumer, connection),
@@ -78,13 +83,24 @@ async fn run_consumer(
                         let db = Arc::clone(db_client);
                         let api_key_hug = api_key_hug.to_string();
                         let api_key_gup = api_key_gup.to_string();
+                        let api_key_hug2 = api_key_hug2.to_string();
+                        let db_logs = Arc::clone(db_logs);
 
-                        tokio::spawn(async move {
-                            match process::process::process_webhook(&data, &db, &api_key_hug, &api_key_gup).await {
-                                Ok(_) => info!("Successfully processed webhook"),
-                                Err(e) => error!("Error processing webhook: {}", e),
+                        let handle = tokio::spawn(async move {
+                            info!("Starting webhook processing in spawned task");
+                            match process::process::process_webhook(&data, &db, &api_key_hug, &api_key_gup, &api_key_hug2, &db_logs).await {
+                                Ok(_) => {
+                                    info!("Successfully processed webhook in spawned task");
+                                },
+                                Err(e) => {
+                                    error!("Error processing webhook in spawned task: {}", e);
+                                }
                             }
                         });
+
+                        if let Err(e) = handle.await {
+                            error!("Spawned task failed: {}", e);
+                        }
 
                         if let Err(e) = delivery.ack(lapin::options::BasicAckOptions::default()).await {
                             error!("Failed to acknowledge message: {}", e);

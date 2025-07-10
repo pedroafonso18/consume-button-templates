@@ -70,7 +70,7 @@ pub struct Metadata {
     pub phone_number_id: String,
 }
 
-pub fn parse_webhook_data(data: &[u8]) -> Result<Option<String>, Box<dyn std::error::Error>> {
+pub fn parse_webhook_data(data: &[u8]) -> Result<Option<(String, String, String)>, Box<dyn std::error::Error>> {
     info!("Parsing webhook data");
     let json_data = String::from_utf8_lossy(data);
     
@@ -91,8 +91,17 @@ pub fn parse_webhook_data(data: &[u8]) -> Result<Option<String>, Box<dyn std::er
                 
                 for message in change.value.messages {
                     if let Some(context) = message.context {
-                        info!("Found message with context, from: {}", context.from);
-                        return Ok(Some(context.from));
+                        let context_from = context.from;
+                        let message_from = message.from;
+                        
+                        // Check if there's a button with text
+                        if let Some(button) = message.button {
+                            let button_text = button.text;
+                            info!("Found message with context and button, context.from: {}, message.from: {}, button.text: {}", context_from, message_from, button_text);
+                            return Ok(Some((context_from, message_from, button_text)));
+                        } else {
+                            info!("Message has context but no button, skipping");
+                        }
                     } else {
                         info!("Message has no context, skipping");
                     }
@@ -110,16 +119,24 @@ pub async fn process_webhook(
     db_client: &Object,
     api_key_hug: &str,
     api_key_gup: &str,
+    api_key_hug2: &str,
+    db_client_logs: &Object
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("Processing webhook...");
-    let source = match parse_webhook_data(data)? {
-        Some(s) => s,
+    let (source, whatsapp_number, button_text) = match parse_webhook_data(data)? {
+        Some((context_from, message_from, button_text)) => (context_from, message_from, button_text),
         None => {
             error!("No source (context.from) found in webhook");
             return Err("No source (context.from) found in webhook".into());
         }
     };
-    info!("Extracted source: {}", source);
+    info!("Extracted source: {}, WhatsApp number: {}, button text: {}", source, whatsapp_number, button_text);
+
+    if button_text != "Vamos Simular!" {
+        info!("Button text '{}' is not 'Vamos Simular!', stopping processing", button_text);
+        return Ok(());
+    }
+    info!("Button text validation passed, continuing with processing");
 
     let uuid = match crate::db::fetch::fetch_uuid(db_client, &source).await? {
         Some(u) => u,
@@ -139,8 +156,16 @@ pub async fn process_webhook(
     };
     info!("Fetched connection: {}", conn);
 
-    let conn_tuple = (conn.clone(), source.clone());
-    crate::api::api::create_contact(api_key_hug, &uuid, conn_tuple, &source, api_key_gup).await?;
-    info!("Contact creation process completed successfully");
-    Ok(())
+    let conn_tuple = (conn, source);
+    crate::api::api::send_gupshup_message(api_key_gup, "Perfeito! 😊\nAgora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite:\n1 para Sim!\n\nDigite:\n2 para Não!\n", conn_tuple, &whatsapp_number).await?;
+    match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n").await {
+        Ok(_) => {
+            info!("Contact creation process completed successfully");
+            Ok(())        
+        },
+        Err(e) => {
+            error!("Error when inserting log: {}",e);
+            Ok(())
+        }
+    }
 }
