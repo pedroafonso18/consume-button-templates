@@ -29,10 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let env_vars = config::config::load();
 
-    let db_pool = db::connect::create_pool(&env_vars.db_url).await?;
-    let db_logs_pool = db::connect::create_pool(&env_vars.db_url_logs).await?;
 
     loop {
+        let db_pool = db::connect::create_pool(&env_vars.db_url).await?;
+        let db_logs_pool = db::connect::create_pool(&env_vars.db_url_logs).await?;    
         let db_client = db_pool.get().await?;
         let db_logs = db_logs_pool.get().await?;
         let db_client = Arc::new(db_client);
