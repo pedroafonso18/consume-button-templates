@@ -27,13 +27,13 @@ COPY src ./src
 RUN touch src/main.rs && cargo build --release
 
 # Final stage
-FROM debian:bookworm-slim
+FROM debian:bullseye-slim
 
 WORKDIR /app
 
-# Install runtime dependencies - using libssl3 for Debian Bookworm
+# Install runtime dependencies - using bullseye which has libssl1.1
 RUN apt-get update && \
-    apt-get install -y ca-certificates libssl3 && \
+    apt-get install -y ca-certificates libssl1.1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

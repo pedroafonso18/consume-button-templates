@@ -132,7 +132,7 @@ pub async fn process_webhook(
     };
     info!("Extracted source: {}, WhatsApp number: {}, button text: {}", source, whatsapp_number, button_text);
 
-    if button_text != "Vamos Simular!" {
+    if !button_text.contains("Vamos"){
         info!("Button text '{}' is not 'Vamos Simular!', stopping processing", button_text);
         match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text).await {
             Ok(_) => {
