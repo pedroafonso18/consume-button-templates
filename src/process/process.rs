@@ -152,7 +152,7 @@ pub async fn process_webhook(
     info!("Fetched connection: {}", conn);
 
     let conn_tuple = (conn, source);
-    if button_text_lwr.contains("sim") || button_text_lwr.contains("chamar") {
+    if button_text_lwr.contains("chamar") {
         crate::api::api::send_gupshup_message(api_key_gup, "Vamos lá! Antes de realizar a consulta, é importante saber: o empréstimo do Bolsa Família pode chegar até R$650, caso o seu benefício esteja liberado.\n\nAtualmente, você recebe o Bolsa Família pelo aplicativo Caixa Tem?\n\nDigite:\n1️⃣ Sim\n2️⃣ Não", conn_tuple, &whatsapp_number).await?;
         match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Vamos lá! Antes de realizar a consulta, é importante saber: o empréstimo do Bolsa Família pode chegar até R$650, caso o seu benefício esteja liberado.\n\nAtualmente, você recebe o Bolsa Família pelo aplicativo Caixa Tem?\n\nDigite:\n1️⃣ Sim\n2️⃣ Não\n", &button_text, "BOLSA").await {
             Ok(_) => {
