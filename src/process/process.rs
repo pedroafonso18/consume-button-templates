@@ -94,7 +94,6 @@ pub fn parse_webhook_data(data: &[u8]) -> Result<Option<(String, String, String)
                         let context_from = context.from;
                         let message_from = message.from;
                         
-                        // Check if there's a button with text
                         if let Some(button) = message.button {
                             let button_text = button.text;
                             info!("Found message with context and button, context.from: {}, message.from: {}, button.text: {}", context_from, message_from, button_text);
@@ -131,20 +130,7 @@ pub async fn process_webhook(
         }
     };
     info!("Extracted source: {}, WhatsApp number: {}, button text: {}", source, whatsapp_number, button_text);
-
-    if !button_text.contains("Vamos") && !button_text.contains("Saber"){
-        info!("Button text '{}' is not 'Vamos Simular!', stopping processing", button_text);
-        match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text).await {
-            Ok(_) => {
-                info!("Contact creation process completed successfully");
-                return Ok(())        
-            },
-            Err(e) => {
-                error!("Error when inserting log: {}",e);
-                return Ok(())
-            }
-        }
-    }
+    let button_text_lwr = button_text.to_lowercase();
     info!("Button text validation passed, continuing with processing");
 
     let uuid = match crate::db::fetch::fetch_uuid(db_client, &source).await? {
@@ -166,15 +152,30 @@ pub async fn process_webhook(
     info!("Fetched connection: {}", conn);
 
     let conn_tuple = (conn, source);
-    crate::api::api::send_gupshup_message(api_key_gup, "Perfeito! 😊\nAgora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite:\n1️⃣ Sim, tenho acesso!\n2️⃣ Não tenho!", conn_tuple, &whatsapp_number).await?;
-    match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text).await {
-        Ok(_) => {
-            info!("Contact creation process completed successfully");
-            Ok(())        
-        },
-        Err(e) => {
-            error!("Error when inserting log: {}",e);
-            Ok(())
+    if button_text_lwr.contains("sim") || button_text_lwr.contains("chamar") {
+        
+        crate::api::api::send_gupshup_message(api_key_gup, "Perfeito! 😊\nAgora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite:\n1️⃣ Sim, tenho acesso!\n2️⃣ Não tenho!", conn_tuple, &whatsapp_number).await?;
+        match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text, "BOLSA").await {
+            Ok(_) => {
+                info!("Contact creation process completed successfully");
+                Ok(())        
+            },
+            Err(e) => {
+                error!("Error when inserting log: {}",e);
+                Ok(())
+            }
+        }
+    } else {
+        crate::api::api::send_gupshup_message(api_key_gup, "Vamos lá! Antes de realizar a consulta, é importante saber: o empréstimo do Bolsa Família pode chegar até R$650, caso o seu benefício esteja liberado.\n\nAtualmente, você recebe o Bolsa Família pelo aplicativo Caixa Tem?\n\nDigite:\n1️⃣ Sim\n2️⃣ Não", conn_tuple, &whatsapp_number).await?;
+        match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text, "FGTS").await {
+            Ok(_) => {
+                info!("Contact creation process completed successfully");
+                Ok(())        
+            },
+            Err(e) => {
+                error!("Error when inserting log: {}",e);
+                Ok(())
+            }
         }
     }
 }

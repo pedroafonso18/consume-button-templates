@@ -6,7 +6,8 @@ pub async fn insert_log(
     client: &deadpool_postgres::Object,
     num: &str,
     msg: &str,
-    resp_cliente: &str
+    resp_cliente: &str,
+    tipo: &str
 ) -> Result<(), Error> {
     info!("Attempting to insert log into the database:");
 
@@ -21,8 +22,8 @@ pub async fn insert_log(
     }
 
     match client.execute(
-        "INSERT INTO \"button-answers\" (num, mensagem, resposta_cliente) VALUES ($1, $2, $3)",
-        &[&num, &msg, &resp_cliente]
+        "INSERT INTO \"button-answers\" (num, mensagem, resposta_cliente, tipo) VALUES ($1, $2, $3, $4)",
+        &[&num, &msg, &resp_cliente, &tipo]
     ).await {
         Ok(_) => Ok(()),
         Err(e) => {
