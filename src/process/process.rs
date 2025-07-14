@@ -164,7 +164,7 @@ pub async fn process_webhook(
                 Ok(())
             }
         }
-    } else {
+    } else if button_text_lwr.contains("vamos") || button_text_lwr.contains("saber"){
         
         crate::api::api::send_gupshup_message(api_key_gup, "Perfeito! 😊\nAgora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite:\n1️⃣ Sim, tenho acesso!\n2️⃣ Não tenho!", conn_tuple, &whatsapp_number).await?;
         match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "Perfeito! Agora, você saberia me informar se ainda tem acesso ao aplicativo do FGTS?\n\nDigite: 1 para Sim!\nDigite: 2 para Não!\n", &button_text, "FGTS").await {
@@ -177,5 +177,16 @@ pub async fn process_webhook(
                 Ok(())
             }
         }
-    } 
+    } else {
+        match crate::db::insert::insert_log(&db_client_logs, &whatsapp_number, "CLIENTE SEM INTERESSE OU RESPOSTA NÃO MAPEADA", &button_text, "SEMINTERESSE").await {
+            Ok(_) => {
+                info!("Contact creation process completed successfully");
+                Ok(())        
+            },
+            Err(e) => {
+                error!("Error when inserting log: {}",e);
+                Ok(())
+            }
+        }
+    }
 }
